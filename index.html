@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Horaires de Prière | Prayer Times</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/feather-icons"></script>
+
+    <style>
+        :root {
+            --glow-color: #00A9FF;
+            --background-start: #010409;
+            --background-end: #0B0014;
+            --card-bg: rgba(13, 17, 23, 0.5);
+            --card-border: rgba(48, 54, 61, 0.5);
+            --text-primary: #E6EDF3;
+            --text-secondary: #7D8590;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(145deg, var(--background-start), var(--background-end));
+            color: var(--text-primary);
+            overflow-y: auto;
+        }
+        
+        #background-aurora {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(ellipse at top, rgba(0, 169, 255, 0.15) 0%, transparent 50%),
+                        radial-gradient(ellipse at bottom, rgba(147, 51, 234, 0.15) 0%, transparent 50%);
+            z-index: -1;
+            animation: pulse-aurora 15s infinite alternate;
+        }
+
+        @keyframes pulse-aurora {
+            from { opacity: 0.8; }
+            to { opacity: 1; }
+        }
+
+        .font-orbitron { font-family: 'Orbitron', sans-serif; }
+
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            border: 1px solid var(--card-border);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        .prayer-card {
+            border: 1px solid var(--card-border);
+            position: relative;
+            overflow: hidden;
+        }
+        .prayer-card:before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 169, 255, 0.2), transparent);
+            transition: 0.5s;
+        }
+        .prayer-card:hover:before {
+            left: 100%;
+        }
+        .prayer-card:hover {
+            border-color: var(--glow-color);
+            transform: translateY(-8px);
+            box-shadow: 0 0 25px rgba(0, 169, 255, 0.2);
+        }
+
+        .next-prayer-glow {
+            border-color: var(--glow-color);
+            box-shadow: 0 0 15px var(--glow-color), 0 0 30px var(--glow-color), inset 0 0 10px rgba(0, 169, 255, 0.3);
+            transform: translateY(-8px) scale(1.02);
+        }
+        .next-prayer-glow .prayer-time, .next-prayer-glow h3 {
+            color: var(--glow-color);
+            text-shadow: 0 0 10px var(--glow-color);
+        }
+
+        .prayer-time { color: var(--text-primary); }
+
+        .loader {
+            border: 4px solid #30363D; border-left-color: var(--glow-color);
+            border-radius: 50%; width: 50px; height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        #settings-modal, #location-modal { transition: opacity 0.3s ease, visibility 0.3s ease; }
+        .modal-content { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+        #settings-modal.hidden, #location-modal.hidden { visibility: hidden; opacity: 0; }
+        #settings-modal:not(.hidden) .modal-content, #location-modal:not(.hidden) .modal-content { transform: translateY(0); box-shadow: 0 0 40px rgba(0,0,0,0.5); }
+        
+        .modal-input {
+            background-color: var(--background-start);
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+        }
+        .modal-input:focus {
+            border-color: var(--glow-color);
+            box-shadow: 0 0 10px rgba(0, 169, 255, 0.3);
+            outline: none;
+        }
+
+        /* Animation for elements fading in */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in-up { animation: fadeInUp 0.6s ease-out forwards; }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div id="background-aurora"></div>
+
+    <div id="main-content" class="relative z-10 min-h-screen flex flex-col items-center justify-center p-4 opacity-0 transition-opacity duration-1000">
+        
+        <header class="text-center mb-8 w-full max-w-7xl relative fade-in-up">
+            <h1 id="current-date" class="text-lg md:text-xl font-light text-gray-400">--</h1>
+            <p id="hijri-date" class="text-sm font-light text-gray-500 mb-2">--</p>
+            <div id="location-wrapper" class="relative group">
+                <p id="location-btn" class="text-2xl md:text-4xl font-bold tracking-wider text-white cursor-pointer group-hover:text-cyan-300 transition-colors duration-300 inline-flex items-center gap-3">
+                    <i data-feather="map-pin" class="h-6 w-6 -mt-1"></i> 
+                    <span id="location-text">Recherche en cours...</span>
+                    <i data-feather="edit-2" class="h-5 w-5 opacity-50 group-hover:opacity-100 transition-opacity"></i>
+                </p>
+            </div>
+            <button id="settings-btn" class="absolute top-0 right-0 p-3 text-gray-400 hover:text-cyan-300 transition-colors duration-300">
+                <i data-feather="settings" class="h-6 w-6"></i>
+            </button>
+        </header>
+
+        <div id="prayer-times-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-5 md:gap-6 w-full max-w-7xl mb-8"></div>
+
+        <div class="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-3 gap-8 text-center">
+            <div class="lg:col-span-2 glass-card rounded-2xl p-6 fade-in-up" style="animation-delay: 0.3s;">
+                <h2 class="text-lg font-semibold text-gray-300 mb-2 tracking-widest">PROCHAINE PRIÈRE</h2>
+                <div id="countdown" class="text-5xl md:text-6xl font-bold text-white tracking-wider">
+                    <span id="countdown-hours">00</span>:<span id="countdown-minutes">00</span>:<span id="countdown-seconds">00</span>
+                </div>
+                <p id="next-prayer-name" class="mt-2 text-xl font-light text-cyan-300 tracking-wider">--</p>
+            </div>
+            <div class="glass-card rounded-2xl p-6 flex flex-col items-center justify-center fade-in-up" style="animation-delay: 0.4s;">
+                 <h2 class="text-lg font-semibold text-gray-300 mb-3 tracking-widest">QIBLA</h2>
+                 <div id="qibla-container" class="relative w-28 h-28">
+                    <div id="qibla-compass" class="transition-transform duration-1000 ease-out">
+                         <svg class="w-full h-full" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="48" stroke="rgba(255,255,255,0.1)" stroke-width="2" fill="none" />
+                            <path d="M 50 2 L 40 20 L 50 15 L 60 20 Z" fill="var(--glow-color)" stroke="var(--glow-color)" stroke-width="1.5" />
+                            <circle cx="50" cy="50" r="5" fill="var(--glow-color)"/>
+                         </svg>
+                    </div>
+                </div>
+                <p id="qibla-direction" class="mt-2 font-semibold text-white text-lg">--°</p>
+            </div>
+        </div>
+    </div>
+    
+    <div id="loader" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gray-900 bg-opacity-90 backdrop-blur-sm">
+        <div class="loader"></div>
+        <p id="loader-text" class="mt-4 text-lg font-semibold text-gray-300">Obtention des heures de prière...</p>
+    </div>
+
+    <!-- Modals -->
+    <div id="settings-modal" class="hidden fixed inset-0 z-40 flex items-center justify-center bg-black bg-opacity-70 p-4">
+        <div class="modal-content glass-card rounded-2xl p-8 w-full max-w-md transform -translate-y-10">
+            <div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-bold text-white">Paramètres</h2><button id="close-settings-btn" class="p-1 text-gray-400 hover:text-white text-3xl leading-none">&times;</button></div>
+            <div>
+                <label for="calculation-method" class="block mb-2 text-sm font-medium text-gray-300">Méthode de calcul</label>
+                <select id="calculation-method" class="w-full modal-input text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 p-3"></select>
+            </div>
+        </div>
+    </div>
+
+    <div id="location-modal" class="hidden fixed inset-0 z-40 flex items-center justify-center bg-black bg-opacity-70 p-4">
+        <div class="modal-content glass-card rounded-2xl p-8 w-full max-w-md transform -translate-y-10">
+            <div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-bold text-white">Changer de lieu</h2><button id="close-location-btn" class="p-1 text-gray-400 hover:text-white text-3xl leading-none">&times;</button></div>
+            <div>
+                <label for="location-search-input" class="block mb-2 text-sm font-medium text-gray-300">Entrez le nom d'une ville</label>
+                <input type="text" id="location-search-input" class="w-full modal-input text-lg rounded-lg p-3" placeholder="Ex: Paris, France">
+                <p class="text-xs text-gray-500 mt-2">Appuyez sur "Entrée" pour valider.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const PRAYER_NAMES = { Fajr: "Fajr", Sunrise: "Shuruq", Dhuhr: "Dhuhr", Asr: "Asr", Maghrib: "Maghrib", Isha: "Isha" };
+            const PRAYER_ICONS = { Fajr: "sunrise", Sunrise: "sun", Dhuhr: "sun", Asr: "sunset", Maghrib: "moon", Isha: "moon" };
+            const FALLBACK_COORDS = { latitude: -12.8275, longitude: 45.166244 };
+            const HIJRI_MONTHS_FR = { "Muḥarram": "Mouharram", "Ṣafar": "Safar", "Rabīʿ al-awwal": "Rabi' al-awwal", "Rabīʿ ath-thānī": "Rabi' al-thani", "Jumādá al-ūlá": "Joumada al-oula", "Jumādá al-ākhirah": "Joumada al-akhira", "Rajab": "Rajab", "Shaʿbān": "Chaabane", "Ramaḍān": "Ramadan", "Shawwāl": "Chawwal", "Dhū al-Qaʿdah": "Dhou al qi'da", "Dhū al-Ḥijjah": "Dhou al-hijja" };
+            const CALCULATION_METHODS = { '3': 'Ligue Islamique Mondiale', '4': 'Umm Al-Qura, Makkah', '2': 'Société Islamique d\'Amérique du Nord (ISNA)', '12': 'Union des Organisations Islamiques de France (UOIF)', '5': 'Autorité générale égyptienne de l\'enquête', '7': 'Institut de géophysique, Université de Téhéran', '15': 'Moonsighting Committee Worldwide' };
+
+            let prayerTimesData = {}, countdownInterval, currentCoords;
+            let calculationMethod = localStorage.getItem('calculationMethod') || '3';
+
+            const elements = {
+                mainContent: document.getElementById('main-content'), loader: document.getElementById('loader'), loaderText: document.getElementById('loader-text'),
+                locationBtn: document.getElementById('location-btn'), locationText: document.getElementById('location-text'), locationSearchInput: document.getElementById('location-search-input'),
+                dateEl: document.getElementById('current-date'), hijriDateEl: document.getElementById('hijri-date'), gridEl: document.getElementById('prayer-times-grid'),
+                countdownHoursEl: document.getElementById('countdown-hours'), countdownMinutesEl: document.getElementById('countdown-minutes'), countdownSecondsEl: document.getElementById('countdown-seconds'),
+                nextPrayerNameEl: document.getElementById('next-prayer-name'), qiblaCompassEl: document.getElementById('qibla-compass'), qiblaDirectionEl: document.getElementById('qibla-direction'),
+                settingsModal: document.getElementById('settings-modal'), settingsBtn: document.getElementById('settings-btn'), closeSettingsBtn: document.getElementById('close-settings-btn'), methodSelect: document.getElementById('calculation-method'),
+                locationModal: document.getElementById('location-modal'), closeLocationBtn: document.getElementById('close-location-btn'),
+            };
+
+            const initIcons = () => feather.replace();
+
+            function initModals() {
+                // Settings Modal
+                Object.entries(CALCULATION_METHODS).forEach(([id, name]) => {
+                    const option = new Option(name, id);
+                    if (id === calculationMethod) option.selected = true;
+                    elements.methodSelect.add(option);
+                });
+                elements.settingsBtn.addEventListener('click', () => elements.settingsModal.classList.remove('hidden'));
+                elements.closeSettingsBtn.addEventListener('click', () => elements.settingsModal.classList.add('hidden'));
+                elements.settingsModal.addEventListener('click', (e) => { if (e.target === elements.settingsModal) elements.settingsModal.classList.add('hidden'); });
+                elements.methodSelect.addEventListener('change', (e) => {
+                    calculationMethod = e.target.value;
+                    localStorage.setItem('calculationMethod', calculationMethod);
+                    elements.settingsModal.classList.add('hidden');
+                    fetchAndDisplayData(currentCoords);
+                });
+
+                // Location Modal
+                elements.locationBtn.addEventListener('click', () => {
+                    elements.locationModal.classList.remove('hidden');
+                    elements.locationSearchInput.focus();
+                });
+                elements.closeLocationBtn.addEventListener('click', () => elements.locationModal.classList.add('hidden'));
+                elements.locationModal.addEventListener('click', (e) => { if (e.target === elements.locationModal) elements.locationModal.classList.add('hidden'); });
+                elements.locationSearchInput.addEventListener('keydown', async (e) => {
+                    if (e.key === 'Enter') {
+                        const query = elements.locationSearchInput.value.trim();
+                        if (query) {
+                            elements.locationModal.classList.add('hidden');
+                            elements.loaderText.textContent = `Recherche de "${query}"...`;
+                            elements.loader.style.display = 'flex';
+                            try {
+                                const geoResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&accept-language=fr`);
+                                const geoData = await geoResponse.json();
+                                if (geoData.length > 0) {
+                                    const { lat, lon } = geoData[0];
+                                    const manualCoords = { latitude: parseFloat(lat), longitude: parseFloat(lon) };
+                                    localStorage.setItem('manualCoords', JSON.stringify(manualCoords));
+                                    currentCoords = manualCoords;
+                                    await fetchAndDisplayData(currentCoords);
+                                } else { alert("Ville non trouvée."); }
+                            } catch (error) { console.error("Erreur de recherche:", error); alert("Erreur lors de la recherche."); }
+                        }
+                    }
+                });
+            }
+
+            async function fetchAPI(url) { /* ... same as before ... */ return fetch(url).then(res => res.ok ? res.json() : Promise.reject(res.status)); }
+            
+            function getUserLocation() { /* ... same as before ... */ 
+                return new Promise((resolve) => {
+                    if (!navigator.geolocation) return resolve(FALLBACK_COORDS);
+                    navigator.geolocation.getCurrentPosition(
+                        (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+                        (err) => {
+                            elements.loaderText.innerHTML = `<span class="text-yellow-400">Localisation refusée.</span><br><span class="text-sm">Position par défaut active.</span>`;
+                            resolve(FALLBACK_COORDS);
+                        }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+                    );
+                });
+            }
+
+            const padZero = (num) => num.toString().padStart(2, '0');
+
+            function updateCountdown() { /* ... same as before ... */
+                const now = new Date();
+                const sortedPrayers = Object.entries(prayerTimesData)
+                    .filter(([name]) => PRAYER_NAMES.hasOwnProperty(name) && name !== 'Sunrise')
+                    .map(([name, time]) => {
+                        const [h, m] = time.split(':');
+                        return { name, date: new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m) };
+                    }).sort((a, b) => a.date - b.date);
+
+                let nextPrayer = sortedPrayers.find(p => p.date > now);
+                if (!nextPrayer) {
+                    nextPrayer = sortedPrayers[0];
+                    nextPrayer.date.setDate(nextPrayer.date.getDate() + 1);
+                }
+
+                const diff = nextPrayer.date - now;
+                elements.countdownHoursEl.textContent = padZero(Math.floor(diff / 3600000));
+                elements.countdownMinutesEl.textContent = padZero(Math.floor((diff % 3600000) / 60000));
+                elements.countdownSecondsEl.textContent = padZero(Math.floor((diff % 60000) / 1000));
+                elements.nextPrayerNameEl.textContent = PRAYER_NAMES[nextPrayer.name];
+
+                document.querySelectorAll('.prayer-card').forEach(c => c.classList.remove('next-prayer-glow'));
+                document.getElementById(`prayer-${nextPrayer.name}`)?.classList.add('next-prayer-glow');
+            }
+
+            async function fetchAndDisplayData(coords) {
+                elements.loader.style.display = 'flex';
+                elements.mainContent.classList.remove('opacity-100');
+                try {
+                    const { latitude, longitude } = coords;
+                    let locationName = "Lieu par défaut";
+                    try {
+                        const geoResponse = await fetchAPI(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=fr`);
+                        const { city, town, village, county, country } = geoResponse.address;
+                        locationName = `${city || town || village || county || 'Lieu inconnu'}, ${country}`;
+                    } catch (e) { console.warn("Could not fetch location name.", e); }
+
+                    const prayerTimesURL = `https://api.aladhan.com/v1/timings/${Math.floor(Date.now() / 1000)}?latitude=${latitude}&longitude=${longitude}&method=${calculationMethod}`;
+                    const qiblaURL = `https://api.aladhan.com/v1/qibla/${latitude}/${longitude}`;
+                    const [prayerResponse, qiblaResponse] = await Promise.all([fetchAPI(prayerTimesURL), fetchAPI(qiblaURL)]);
+
+                    const prayerData = prayerResponse.data;
+                    const qiblaData = qiblaResponse.data;
+
+                    prayerTimesData = prayerData.timings;
+                    elements.gridEl.innerHTML = Object.keys(PRAYER_NAMES).map((key, index) => {
+                        const [h, m] = prayerData.timings[key].split(':');
+                        const time = new Date(1970, 0, 1, h, m).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', hour12: false });
+                        return `<div id="prayer-${key}" class="prayer-card glass-card rounded-2xl p-4 text-center fade-in-up" style="animation-delay: ${index * 100}ms;">
+                                    <i data-feather="${PRAYER_ICONS[key]}" class="mx-auto h-8 w-8 text-gray-400 mb-3"></i>
+                                    <h3 class="text-lg font-semibold">${PRAYER_NAMES[key]}</h3>
+                                    <p class="text-2xl font-bold prayer-time mt-1">${time}</p>
+                                </div>`;
+                    }).join('');
+
+                    elements.locationText.textContent = locationName;
+                    elements.dateEl.textContent = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+                    const hijri = prayerData.date.hijri;
+                    elements.hijriDateEl.textContent = `${hijri.day} ${HIJRI_MONTHS_FR[hijri.month.en] || hijri.month.en} ${hijri.year} AH`;
+                    elements.qiblaDirectionEl.textContent = `${Math.round(qiblaData.direction)}°`;
+                    elements.qiblaCompassEl.style.transform = `rotate(${qiblaData.direction}deg)`;
+
+                    if (countdownInterval) clearInterval(countdownInterval);
+                    updateCountdown();
+                    countdownInterval = setInterval(updateCountdown, 1000);
+                    
+                    elements.mainContent.classList.add('opacity-100');
+                    initIcons();
+                } catch (error) {
+                    console.error("Failed to fetch and display data:", error);
+                    elements.loaderText.innerHTML = `<span class="text-red-400">Erreur de chargement.</span><br><span class="text-sm">Veuillez vérifier votre connexion.</span>`;
+                } finally {
+                    elements.loader.style.display = 'none';
+                }
+            }
+
+            async function main() {
+                initModals();
+                const savedCoords = localStorage.getItem('manualCoords');
+                currentCoords = savedCoords ? JSON.parse(savedCoords) : await getUserLocation();
+                await fetchAndDisplayData(currentCoords);
+            }
+
+            main();
+        });
+    </script>
+</body>
+</html>
+
+
