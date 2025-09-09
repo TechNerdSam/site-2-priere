@@ -46,8 +46,6 @@
             to { opacity: 1; }
         }
 
-        .font-orbitron { font-family: 'Orbitron', sans-serif; }
-
         .glass-card {
             background: var(--card-bg);
             backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
@@ -154,15 +152,15 @@
             <div class="glass-card rounded-2xl p-6 flex flex-col items-center justify-center fade-in-up" style="animation-delay: 0.4s;">
                  <h2 class="text-lg font-semibold text-gray-300 mb-3 tracking-widest">QIBLA</h2>
                  <div id="qibla-container" class="relative w-28 h-28">
-                    <div id="qibla-compass" class="transition-transform duration-1000 ease-out">
+                     <div id="qibla-compass" class="transition-transform duration-1000 ease-out">
                          <svg class="w-full h-full" viewBox="0 0 100 100">
-                            <circle cx="50" cy="50" r="48" stroke="rgba(255,255,255,0.1)" stroke-width="2" fill="none" />
-                            <path d="M 50 2 L 40 20 L 50 15 L 60 20 Z" fill="var(--glow-color)" stroke="var(--glow-color)" stroke-width="1.5" />
-                            <circle cx="50" cy="50" r="5" fill="var(--glow-color)"/>
+                             <circle cx="50" cy="50" r="48" stroke="rgba(255,255,255,0.1)" stroke-width="2" fill="none" />
+                             <path d="M 50 2 L 40 20 L 50 15 L 60 20 Z" fill="var(--glow-color)" stroke="var(--glow-color)" stroke-width="1.5" />
+                             <circle cx="50" cy="50" r="5" fill="var(--glow-color)"/>
                          </svg>
-                    </div>
-                </div>
-                <p id="qibla-direction" class="mt-2 font-semibold text-white text-lg">--°</p>
+                     </div>
+                 </div>
+                 <p id="qibla-direction" class="mt-2 font-semibold text-white text-lg">--°</p>
             </div>
         </div>
     </div>
@@ -198,12 +196,12 @@
         document.addEventListener('DOMContentLoaded', () => {
             const PRAYER_NAMES = { Fajr: "Fajr", Sunrise: "Shuruq", Dhuhr: "Dhuhr", Asr: "Asr", Maghrib: "Maghrib", Isha: "Isha" };
             const PRAYER_ICONS = { Fajr: "sunrise", Sunrise: "sun", Dhuhr: "sun", Asr: "sunset", Maghrib: "moon", Isha: "moon" };
-            const FALLBACK_COORDS = { latitude: -12.8275, longitude: 45.166244 };
+            const FALLBACK_COORDS = { latitude: -12.8275, longitude: 45.166244 }; // Coordonnées pour Mayotte
             const HIJRI_MONTHS_FR = { "Muḥarram": "Mouharram", "Ṣafar": "Safar", "Rabīʿ al-awwal": "Rabi' al-awwal", "Rabīʿ ath-thānī": "Rabi' al-thani", "Jumādá al-ūlá": "Joumada al-oula", "Jumādá al-ākhirah": "Joumada al-akhira", "Rajab": "Rajab", "Shaʿbān": "Chaabane", "Ramaḍān": "Ramadan", "Shawwāl": "Chawwal", "Dhū al-Qaʿdah": "Dhou al qi'da", "Dhū al-Ḥijjah": "Dhou al-hijja" };
             const CALCULATION_METHODS = { '3': 'Ligue Islamique Mondiale', '4': 'Umm Al-Qura, Makkah', '2': 'Société Islamique d\'Amérique du Nord (ISNA)', '12': 'Union des Organisations Islamiques de France (UOIF)', '5': 'Autorité générale égyptienne de l\'enquête', '7': 'Institut de géophysique, Université de Téhéran', '15': 'Moonsighting Committee Worldwide' };
 
             let prayerTimesData = {}, countdownInterval, currentCoords;
-            let calculationMethod = localStorage.getItem('calculationMethod') || '3';
+            let calculationMethod = localStorage.getItem('calculationMethod') || '12'; // UOIF par défaut
 
             const elements = {
                 mainContent: document.getElementById('main-content'), loader: document.getElementById('loader'), loaderText: document.getElementById('loader-text'),
@@ -264,9 +262,15 @@
                 });
             }
 
-            async function fetchAPI(url) { /* ... same as before ... */ return fetch(url).then(res => res.ok ? res.json() : Promise.reject(res.status)); }
+            async function fetchAPI(url) {
+                const response = await fetch(url);
+                if (response.ok) {
+                    return response.json();
+                }
+                return Promise.reject(response.status);
+            }
             
-            function getUserLocation() { /* ... same as before ... */ 
+            function getUserLocation() {
                 return new Promise((resolve) => {
                     if (!navigator.geolocation) return resolve(FALLBACK_COORDS);
                     navigator.geolocation.getCurrentPosition(
@@ -281,7 +285,7 @@
 
             const padZero = (num) => num.toString().padStart(2, '0');
 
-            function updateCountdown() { /* ... same as before ... */
+            function updateCountdown() {
                 const now = new Date();
                 const sortedPrayers = Object.entries(prayerTimesData)
                     .filter(([name]) => PRAYER_NAMES.hasOwnProperty(name) && name !== 'Sunrise')
@@ -293,7 +297,12 @@
                 let nextPrayer = sortedPrayers.find(p => p.date > now);
                 if (!nextPrayer) {
                     nextPrayer = sortedPrayers[0];
-                    nextPrayer.date.setDate(nextPrayer.date.getDate() + 1);
+                    if (nextPrayer) {
+                       nextPrayer.date.setDate(nextPrayer.date.getDate() + 1);
+                    } else {
+                        // Handle case where there are no prayers
+                        return;
+                    }
                 }
 
                 const diff = nextPrayer.date - now;
@@ -369,5 +378,3 @@
     </script>
 </body>
 </html>
-
-
