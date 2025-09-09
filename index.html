@@ -11,11 +11,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/feather-icons"></script>
 
-    <!-- LeafletJS for Map -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
-
     <style>
         :root {
             --glow-color: #00A9FF;
@@ -121,15 +116,6 @@
         }
         .fade-in-up { animation: fadeInUp 0.6s ease-out forwards; }
         
-        .leaflet-container {
-            background-color: var(--background-start) !important;
-        }
-        .leaflet-control-attribution a {
-            color: var(--glow-color) !important;
-        }
-        .leaflet-tile-pane {
-            filter: grayscale(1) brightness(0.8) contrast(1.2);
-        }
     </style>
 </head>
 <body class="antialiased">
@@ -155,34 +141,62 @@
 
         <div id="prayer-times-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-5 md:gap-6 w-full max-w-7xl mb-8"></div>
 
-        <div class="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-3 gap-8 text-center">
-            <div class="lg:col-span-2 glass-card rounded-2xl p-6 fade-in-up" style="animation-delay: 0.3s;">
+        <div class="w-full max-w-7xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 text-center">
+            <!-- Next Prayer -->
+            <div class="lg:col-span-2 glass-card rounded-2xl p-6 flex flex-col justify-center fade-in-up" style="animation-delay: 0.3s;">
                 <h2 class="text-lg font-semibold text-gray-300 mb-2 tracking-widest">PROCHAINE PRIÈRE</h2>
                 <div id="countdown" class="text-5xl md:text-6xl font-bold text-white tracking-wider">
                     <span id="countdown-hours">00</span>:<span id="countdown-minutes">00</span>:<span id="countdown-seconds">00</span>
                 </div>
                 <p id="next-prayer-name" class="mt-2 text-xl font-light text-cyan-300 tracking-wider">--</p>
             </div>
-            <div class="glass-card rounded-2xl p-6 flex flex-col items-center justify-center fade-in-up" style="animation-delay: 0.4s;">
-                <div class="flex items-center justify-center gap-2 mb-2">
-                    <h2 class="text-lg font-semibold text-gray-300 tracking-widest">QIBLA</h2>
-                    <button id="calibrate-qibla-btn" title="Activer la boussole dynamique" class="text-gray-400 hover:text-cyan-300 transition-colors duration-300 hidden">
-                        <i data-feather="compass" class="h-5 w-5"></i>
+            
+            <!-- Tasbih Counter -->
+            <div class="lg:col-span-2 glass-card rounded-2xl p-6 flex flex-col justify-center text-center fade-in-up" style="animation-delay: 0.4s;">
+                <div class="flex justify-between items-center w-full mb-3">
+                    <h2 class="text-lg font-semibold text-gray-300 tracking-widest">TASBIH</h2>
+                    <button id="tasbih-reset-btn" class="p-2 text-gray-400 hover:text-red-400 transition-colors duration-300" title="Réinitialiser">
+                        <i data-feather="refresh-cw" class="h-5 w-5"></i>
                     </button>
                 </div>
-                <div id="qibla-container" class="relative w-full h-40 bg-gray-900/50 rounded-lg overflow-hidden">
-                    <div id="qibla-compass-wrapper" class="w-full h-full flex items-center justify-center hidden">
-                         <div id="qibla-compass" class="w-28 h-28 transition-transform duration-1000 ease-out">
-                             <svg class="w-full h-full" viewBox="0 0 100 100">
-                                 <circle cx="50" cy="50" r="48" stroke="rgba(255,255,255,0.1)" stroke-width="2" fill="none" />
-                                 <path d="M 50 2 L 40 20 L 50 15 L 60 20 Z" fill="var(--glow-color)" stroke="var(--glow-color)" stroke-width="1.5" />
-                                 <circle cx="50" cy="50" r="5" fill="var(--glow-color)"/>
-                             </svg>
-                         </div>
-                    </div>
-                    <div id="qibla-map" class="w-full h-full hidden"></div>
+                <p id="tasbih-count" class="text-7xl font-bold text-white tracking-wider cursor-pointer select-none" title="Cliquez pour compter">0</p>
+                <div class="w-full text-xs text-gray-500 mt-2">Cliquez sur le nombre pour compter</div>
+            </div>
+
+            <!-- Verse of the Day -->
+            <div class="glass-card rounded-2xl p-6 flex flex-col items-center justify-center text-center fade-in-up" style="animation-delay: 0.5s;">
+                <h2 class="text-lg font-semibold text-gray-300 mb-3 tracking-widest">VERSET DU JOUR</h2>
+                <div class="flex-grow flex flex-col justify-center min-h-[80px]">
+                    <p id="verse-text" class="text-base text-gray-200 italic">--</p>
+                    <p id="verse-source" class="text-sm text-cyan-400 mt-2">--</p>
                 </div>
-                <p id="qibla-direction" class="mt-2 font-semibold text-white text-lg">--°</p>
+            </div>
+
+            <!-- Hadith of the Day -->
+            <div class="glass-card rounded-2xl p-6 flex flex-col items-center justify-center text-center fade-in-up" style="animation-delay: 0.6s;">
+                <h2 class="text-lg font-semibold text-gray-300 mb-3 tracking-widest">HADITH DU JOUR</h2>
+                <div class="flex-grow flex flex-col justify-center min-h-[80px]">
+                    <p id="hadith-text" class="text-base text-gray-200 italic">--</p>
+                    <p id="hadith-source" class="text-sm text-cyan-400 mt-2">--</p>
+                </div>
+            </div>
+
+            <!-- Name of Allah -->
+            <div class="glass-card rounded-2xl p-6 flex flex-col items-center justify-center text-center fade-in-up" style="animation-delay: 0.7s;">
+                <h2 class="text-lg font-semibold text-gray-300 mb-3 tracking-widest">NOM D'ALLAH</h2>
+                <div class="flex-grow flex flex-col justify-center min-h-[80px]">
+                     <p id="asma-name" class="text-2xl font-bold text-cyan-300">--</p>
+                     <p id="asma-meaning" class="text-base text-white mt-1">--</p>
+                </div>
+            </div>
+
+            <!-- Upcoming Islamic Event -->
+            <div class="glass-card rounded-2xl p-6 flex flex-col items-center justify-center text-center fade-in-up" style="animation-delay: 0.8s;">
+                <h2 class="text-lg font-semibold text-gray-300 mb-3 tracking-widest">PROCHAIN ÉVÉNEMENT</h2>
+                <div class="flex-grow flex flex-col justify-center min-h-[80px]">
+                     <p id="event-name" class="text-xl font-bold text-cyan-300">--</p>
+                     <p id="event-countdown" class="text-lg text-white mt-1">--</p>
+                </div>
             </div>
         </div>
     </div>
@@ -221,11 +235,46 @@
             const FALLBACK_COORDS = { latitude: -12.8275, longitude: 45.166244 }; // Coordonnées pour Mayotte
             const HIJRI_MONTHS_FR = { "Muḥarram": "Mouharram", "Ṣafar": "Safar", "Rabīʿ al-awwal": "Rabi' al-awwal", "Rabīʿ ath-thānī": "Rabi' al-thani", "Jumādá al-ūlá": "Joumada al-oula", "Jumādá al-ākhirah": "Joumada al-akhira", "Rajab": "Rajab", "Shaʿbān": "Chaabane", "Ramaḍān": "Ramadan", "Shawwāl": "Chawwal", "Dhū al-Qaʿdah": "Dhou al qi'da", "Dhū al-Ḥijjah": "Dhou al-hijja" };
             const CALCULATION_METHODS = { '3': 'Ligue Islamique Mondiale', '4': 'Umm Al-Qura, Makkah', '2': 'Société Islamique d\'Amérique du Nord (ISNA)', '12': 'Union des Organisations Islamiques de France (UOIF)', '5': 'Autorité générale égyptienne de l\'enquête', '7': 'Institut de géophysique, Université de Téhéran', '15': 'Moonsighting Committee Worldwide' };
+            const VERSES = [
+                { text: "Allah n'impose à aucune âme une charge supérieure à sa capacité.", source: "Coran 2:286" },
+                { text: "Et quiconque craint Allah, Il lui donnera une issue favorable.", source: "Coran 65:2" },
+                { text: "En vérité, avec la difficulté vient la facilité.", source: "Coran 94:6" },
+                { text: "Et c'est en Allah que les croyants doivent placer leur confiance.", source: "Coran 3:122" },
+                { text: "Les bonnes œuvres effacent les mauvaises.", source: "Coran 11:114" },
+                { text: "Et soyez patients. Assurément, Allah est avec les patients.", source: "Coran 8:46" },
+                { text: "Appelez-Moi, Je vous répondrai.", source: "Coran 40:60" },
+                { text: "Et ne désespérez pas de la miséricorde d'Allah.", source: "Coran 39:53" },
+                { text: "En vérité, le rappel d'Allah est le plus grand.", source: "Coran 29:45" },
+                { text: "Celui qui fait un atome de bien le verra.", source: "Coran 99:7" }
+            ];
+            const HADITHS = [
+                { text: "Celui qui n'est pas miséricordieux envers les autres ne sera pas traité avec miséricorde.", source: "Sahih al-Bukhari" },
+                { text: "La richesse ne consiste pas à posséder beaucoup de biens, mais la richesse, c'est d'être content de soi-même.", source: "Sahih Muslim" },
+                { text: "L'homme fort n'est pas le bon lutteur ; l'homme fort n'est que celui qui se maîtrise quand il est en colère.", source: "Sahih al-Bukhari" },
+                { text: "Les meilleures personnes parmi vous sont celles qui ont les meilleures mœurs et le meilleur caractère.", source: "Sahih al-Bukhari" },
+                { text: "Facilitez les choses aux gens, et ne les rendez pas difficiles.", source: "Sahih al-Bukhari" },
+                { text: "Aucun de vous ne croit vraiment tant qu'il ne désire pas pour son frère ce qu'il désire pour lui-même.", source: "Sahih al-Bukhari" }
+            ];
+            const ASMAUL_HUSNA = [
+                { name: "Ar-Rahman", meaning: "Le Tout-Miséricordieux" }, { name: "Ar-Rahim", meaning: "Le Très-Miséricordieux" }, { name: "Al-Malik", meaning: "Le Souverain" },
+                { name: "Al-Quddus", meaning: "Le Saint" }, { name: "As-Salam", meaning: "La Paix" }, { name: "Al-Mu'min", meaning: "Le Fidèle" },
+                { name: "Al-Muhaymin", meaning: "Le Dominateur" }, { name: "Al-Aziz", meaning: "Le Tout-Puissant" }, { name: "Al-Jabbar", meaning: "Celui qui contraint" },
+                { name: "Al-Mutakabbir", meaning: "Le Superbe" }, { name: "Al-Khaliq", meaning: "Le Créateur" }, { name: "Al-Bari'", meaning: "Le Producteur" }
+            ];
+            const ISLAMIC_EVENTS = [
+                { name: "Début du Ramadan", date: "2025-02-28" },
+                { name: "Aïd al-Fitr", date: "2025-03-30" },
+                { name: "Jour de Arafat", date: "2025-06-05" },
+                { name: "Aïd al-Adha", date: "2025-06-06" },
+                { name: "Nouvel An Islamique", date: "2025-06-26" },
+                { name: "Achoura", date: "2025-07-05" },
+                { name: "Mawlid an-Nabi", date: "2025-09-04" },
+                { name: "Début du Ramadan", date: "2026-02-17" },
+                { name: "Aïd al-Fitr", date: "2026-03-20" },
+            ];
 
-            let prayerTimesData = {}, countdownInterval, currentCoords, qiblaMap = null;
+            let prayerTimesData = {}, countdownInterval, currentCoords;
             let calculationMethod = localStorage.getItem('calculationMethod') || '12';
-            let qiblaDirection = 0;
-            let compassListenerActive = false;
 
             const elements = {
                 mainContent: document.getElementById('main-content'), loader: document.getElementById('loader'), loaderText: document.getElementById('loader-text'),
@@ -233,11 +282,13 @@
                 dateEl: document.getElementById('current-date'), hijriDateEl: document.getElementById('hijri-date'), gridEl: document.getElementById('prayer-times-grid'),
                 countdownHoursEl: document.getElementById('countdown-hours'), countdownMinutesEl: document.getElementById('countdown-minutes'), countdownSecondsEl: document.getElementById('countdown-seconds'),
                 nextPrayerNameEl: document.getElementById('next-prayer-name'), 
-                qiblaCompassWrapper: document.getElementById('qibla-compass-wrapper'), qiblaCompassEl: document.getElementById('qibla-compass'), qiblaDirectionEl: document.getElementById('qibla-direction'),
-                qiblaMapEl: document.getElementById('qibla-map'),
                 settingsModal: document.getElementById('settings-modal'), settingsBtn: document.getElementById('settings-btn'), closeSettingsBtn: document.getElementById('close-settings-btn'), methodSelect: document.getElementById('calculation-method'),
                 locationModal: document.getElementById('location-modal'), closeLocationBtn: document.getElementById('close-location-btn'),
-                calibrateQiblaBtn: document.getElementById('calibrate-qibla-btn'),
+                verseText: document.getElementById('verse-text'), verseSource: document.getElementById('verse-source'),
+                hadithText: document.getElementById('hadith-text'), hadithSource: document.getElementById('hadith-source'),
+                asmaName: document.getElementById('asma-name'), asmaMeaning: document.getElementById('asma-meaning'),
+                eventName: document.getElementById('event-name'), eventCountdown: document.getElementById('event-countdown'),
+                tasbihCount: document.getElementById('tasbih-count'), tasbihResetBtn: document.getElementById('tasbih-reset-btn'),
             };
 
             const initIcons = () => feather.replace();
@@ -287,57 +338,6 @@
                 });
             }
 
-            function handleOrientation(event) {
-                // 'alpha' is the compass direction in degrees, 0 is North.
-                let heading = event.webkitCompassHeading || event.alpha;
-                if (heading !== null && typeof heading !== "undefined") {
-                    // Adjust the Qibla direction based on the phone's current heading.
-                    const rotation = qiblaDirection - heading;
-                    // Apply rotation to compass element with minimal transition for smoothness.
-                    elements.qiblaCompassEl.style.transition = 'transform 0.1s linear';
-                    elements.qiblaCompassEl.style.transform = `rotate(${rotation}deg)`;
-                }
-            }
-
-            function setupCompass() {
-                const startListener = (eventName) => {
-                    if (!compassListenerActive) {
-                        window.addEventListener(eventName, handleOrientation, true);
-                        compassListenerActive = true;
-                        elements.calibrateQiblaBtn.classList.add('hidden');
-                        // Immediately update UI to reflect dynamic compass activation
-                        if (qiblaDirection) {
-                           fetchAndDisplayData(currentCoords);
-                        }
-                    }
-                };
-
-                // iOS 13+ requires user permission for Device Orientation events.
-                if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                    elements.calibrateQiblaBtn.classList.remove('hidden');
-                    initIcons(); 
-                    elements.calibrateQiblaBtn.addEventListener('click', () => {
-                        DeviceOrientationEvent.requestPermission()
-                            .then(permissionState => {
-                                if (permissionState === 'granted') {
-                                    // Prefer 'deviceorientationabsolute' for true north, fallback to 'deviceorientation'.
-                                    const eventName = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation';
-                                    startListener(eventName);
-                                }
-                            })
-                            .catch(console.error);
-                    }, { once: true });
-                } else {
-                    // For other devices (like Android), check for the best available event.
-                    if ('ondeviceorientationabsolute' in window) {
-                        startListener('deviceorientationabsolute');
-                    } else if ('ondeviceorientation' in window) {
-                        startListener('deviceorientation');
-                    }
-                }
-            }
-
-
             async function fetchAPI(url) {
                 const response = await fetch(url);
                 if (response.ok) return response.json();
@@ -386,16 +386,70 @@
                 document.getElementById(`prayer-${nextPrayer.name}`)?.classList.add('next-prayer-glow');
             }
             
-            function calculateDestinationPoint(lat, lon, bearing, distance) {
-                const R = 6371; // Earth's radius in km
-                const d = distance / R;
-                const brng = bearing * Math.PI / 180;
-                const lat1 = lat * Math.PI / 180;
-                const lon1 = lon * Math.PI / 180;
-                const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(brng));
-                let lon2 = lon1 + Math.atan2(Math.sin(brng) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
-                lon2 = (lon2 + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
-                return { lat: lat2 * 180 / Math.PI, lon: lon2 * 180 / Math.PI };
+            function getDayOfYear() {
+                return Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
+            }
+
+            function displayDailyVerse() {
+                const verse = VERSES[getDayOfYear() % VERSES.length];
+                elements.verseText.textContent = `"${verse.text}"`;
+                elements.verseSource.textContent = verse.source;
+            }
+
+            function displayDailyHadith() {
+                const hadith = HADITHS[getDayOfYear() % HADITHS.length];
+                elements.hadithText.textContent = `"${hadith.text}"`;
+                elements.hadithSource.textContent = hadith.source;
+            }
+
+            function displayDailyNameOfAllah() {
+                const asma = ASMAUL_HUSNA[getDayOfYear() % ASMAUL_HUSNA.length];
+                elements.asmaName.textContent = asma.name;
+                elements.asmaMeaning.textContent = asma.meaning;
+            }
+
+            function displayNextIslamicEvent() {
+                const now = new Date();
+                now.setHours(0, 0, 0, 0);
+
+                const nextEvent = ISLAMIC_EVENTS
+                    .map(event => ({ ...event, dateObj: new Date(event.date + 'T00:00:00') }))
+                    .find(event => event.dateObj >= now);
+
+                if (nextEvent) {
+                    const diffTime = nextEvent.dateObj - now;
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    elements.eventName.textContent = nextEvent.name;
+                    if (diffDays === 0) {
+                        elements.eventCountdown.textContent = `Aujourd'hui`;
+                    } else if (diffDays === 1) {
+                         elements.eventCountdown.textContent = `Demain`;
+                    } else {
+                        elements.eventCountdown.textContent = `Dans ${diffDays} jours`;
+                    }
+                } else {
+                    elements.eventName.textContent = "Aucun événement proche";
+                    elements.eventCountdown.textContent = "Veuillez consulter plus tard";
+                }
+            }
+
+            function initTasbih() {
+                let count = parseInt(localStorage.getItem('tasbihCount') || '0');
+                elements.tasbihCount.textContent = count;
+
+                const updateTasbih = (newCount) => {
+                    count = newCount;
+                    localStorage.setItem('tasbihCount', count);
+                    elements.tasbihCount.textContent = count;
+                };
+
+                elements.tasbihCount.addEventListener('click', () => {
+                    updateTasbih(count + 1);
+                });
+
+                elements.tasbihResetBtn.addEventListener('click', () => {
+                    updateTasbih(0);
+                });
             }
 
             async function fetchAndDisplayData(coords) {
@@ -403,7 +457,7 @@
                 elements.mainContent.classList.remove('opacity-100');
                 try {
                     const { latitude, longitude } = coords;
-                    currentCoords = coords; // Ensure currentCoords is always up-to-date
+                    currentCoords = coords; 
                     let locationName = "Lieu par défaut";
                     try {
                         const geoResponse = await fetchAPI(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=fr`);
@@ -412,8 +466,7 @@
                     } catch (e) { console.warn("Could not fetch location name.", e); }
 
                     const prayerTimesURL = `https://api.aladhan.com/v1/timings/${Math.floor(Date.now() / 1000)}?latitude=${latitude}&longitude=${longitude}&method=${calculationMethod}`;
-                    const qiblaURL = `https://api.aladhan.com/v1/qibla/${latitude}/${longitude}`;
-                    const [prayerResponse, qiblaResponse] = await Promise.all([fetchAPI(prayerTimesURL), fetchAPI(qiblaURL)]);
+                    const prayerResponse = await fetchAPI(prayerTimesURL);
 
                     const prayerData = prayerResponse.data;
                     prayerTimesData = prayerData.timings;
@@ -432,30 +485,10 @@
                     const hijri = prayerData.date.hijri;
                     elements.hijriDateEl.textContent = `${hijri.day} ${HIJRI_MONTHS_FR[hijri.month.en] || hijri.month.en} ${hijri.year} AH`;
                     
-                    qiblaDirection = qiblaResponse.data.direction;
-
-                    if (compassListenerActive) {
-                        elements.qiblaMapEl.classList.add('hidden');
-                        elements.qiblaCompassWrapper.classList.remove('hidden');
-                        elements.qiblaDirectionEl.innerHTML = `${Math.round(qiblaDirection)}° <span class="text-xs text-cyan-400">(Dynamique)</span>`;
-                        elements.qiblaCompassEl.style.transform = `rotate(0deg)`;
-                    } else {
-                        elements.qiblaCompassWrapper.classList.add('hidden');
-                        elements.qiblaMapEl.classList.remove('hidden');
-                        elements.qiblaDirectionEl.innerHTML = `${Math.round(qiblaDirection)}° <span class="text-xs text-gray-500">(Direction sur la carte)</span>`;
-                        
-                        if (qiblaMap) qiblaMap.remove();
-                        qiblaMap = L.map(elements.qiblaMapEl, { zoomControl: false, attributionControl: false }).setView([latitude, longitude], 13);
-                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(qiblaMap);
-
-                        L.marker([latitude, longitude]).addTo(qiblaMap);
-                        const dest = calculateDestinationPoint(latitude, longitude, qiblaDirection, 2000);
-                        const polyline = L.polyline([[latitude, longitude], [dest.lat, dest.lon]], {color: 'var(--glow-color)', weight: 3}).addTo(qiblaMap);
-                        L.polylineDecorator(polyline, {
-                            patterns: [{ offset: '100%', repeat: 0, symbol: L.Symbol.arrowHead({ pixelSize: 12, polygon: false, pathOptions: { stroke: true, color: 'var(--glow-color)', weight: 2 } }) }]
-                        }).addTo(qiblaMap);
-                        qiblaMap.fitBounds(polyline.getBounds(), { padding: [20, 20] });
-                    }
+                    displayDailyVerse();
+                    displayDailyHadith();
+                    displayDailyNameOfAllah();
+                    displayNextIslamicEvent();
 
                     if (countdownInterval) clearInterval(countdownInterval);
                     updateCountdown();
@@ -473,7 +506,7 @@
 
             async function main() {
                 initModals();
-                setupCompass();
+                initTasbih();
                 const savedCoords = localStorage.getItem('manualCoords');
                 currentCoords = savedCoords ? JSON.parse(savedCoords) : await getUserLocation();
                 await fetchAndDisplayData(currentCoords);
