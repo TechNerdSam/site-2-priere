@@ -150,8 +150,13 @@
                 <p id="next-prayer-name" class="mt-2 text-xl font-light text-cyan-300 tracking-wider">--</p>
             </div>
             <div class="glass-card rounded-2xl p-6 flex flex-col items-center justify-center fade-in-up" style="animation-delay: 0.4s;">
-                 <h2 class="text-lg font-semibold text-gray-300 mb-3 tracking-widest">QIBLA</h2>
-                 <div id="qibla-container" class="relative w-28 h-28">
+                <div class="flex items-center justify-center gap-2 mb-2">
+                    <h2 class="text-lg font-semibold text-gray-300 tracking-widest">QIBLA</h2>
+                    <button id="calibrate-qibla-btn" title="Activer la boussole dynamique" class="text-gray-400 hover:text-cyan-300 transition-colors duration-300 hidden">
+                        <i data-feather="compass" class="h-5 w-5"></i>
+                    </button>
+                </div>
+                <div id="qibla-container" class="relative w-28 h-28">
                      <div id="qibla-compass" class="transition-transform duration-1000 ease-out">
                          <svg class="w-full h-full" viewBox="0 0 100 100">
                              <circle cx="50" cy="50" r="48" stroke="rgba(255,255,255,0.1)" stroke-width="2" fill="none" />
@@ -159,8 +164,8 @@
                              <circle cx="50" cy="50" r="5" fill="var(--glow-color)"/>
                          </svg>
                      </div>
-                 </div>
-                 <p id="qibla-direction" class="mt-2 font-semibold text-white text-lg">--°</p>
+                </div>
+                <p id="qibla-direction" class="mt-2 font-semibold text-white text-lg">--°</p>
             </div>
         </div>
     </div>
@@ -201,7 +206,9 @@
             const CALCULATION_METHODS = { '3': 'Ligue Islamique Mondiale', '4': 'Umm Al-Qura, Makkah', '2': 'Société Islamique d\'Amérique du Nord (ISNA)', '12': 'Union des Organisations Islamiques de France (UOIF)', '5': 'Autorité générale égyptienne de l\'enquête', '7': 'Institut de géophysique, Université de Téhéran', '15': 'Moonsighting Committee Worldwide' };
 
             let prayerTimesData = {}, countdownInterval, currentCoords;
-            let calculationMethod = localStorage.getItem('calculationMethod') || '12'; // UOIF par défaut
+            let calculationMethod = localStorage.getItem('calculationMethod') || '12';
+            let qiblaDirection = 0;
+            let compassListenerActive = false;
 
             const elements = {
                 mainContent: document.getElementById('main-content'), loader: document.getElementById('loader'), loaderText: document.getElementById('loader-text'),
@@ -211,12 +218,12 @@
                 nextPrayerNameEl: document.getElementById('next-prayer-name'), qiblaCompassEl: document.getElementById('qibla-compass'), qiblaDirectionEl: document.getElementById('qibla-direction'),
                 settingsModal: document.getElementById('settings-modal'), settingsBtn: document.getElementById('settings-btn'), closeSettingsBtn: document.getElementById('close-settings-btn'), methodSelect: document.getElementById('calculation-method'),
                 locationModal: document.getElementById('location-modal'), closeLocationBtn: document.getElementById('close-location-btn'),
+                calibrateQiblaBtn: document.getElementById('calibrate-qibla-btn'),
             };
 
             const initIcons = () => feather.replace();
 
             function initModals() {
-                // Settings Modal
                 Object.entries(CALCULATION_METHODS).forEach(([id, name]) => {
                     const option = new Option(name, id);
                     if (id === calculationMethod) option.selected = true;
@@ -232,7 +239,6 @@
                     fetchAndDisplayData(currentCoords);
                 });
 
-                // Location Modal
                 elements.locationBtn.addEventListener('click', () => {
                     elements.locationModal.classList.remove('hidden');
                     elements.locationSearchInput.focus();
@@ -262,11 +268,59 @@
                 });
             }
 
+            function handleOrientation(event) {
+                // webkitCompassHeading est pour iOS. alpha est la norme.
+                let heading = event.webkitCompassHeading || event.alpha;
+                // Nous devons avoir une valeur d'orientation pour continuer
+                if (heading !== null && typeof heading !== "undefined") {
+                    // Ajuster la direction de la Qibla en fonction de l'orientation actuelle du téléphone
+                    const rotation = qiblaDirection - heading;
+                    // Appliquer la rotation à l'élément de la boussole
+                    elements.qiblaCompassEl.style.transition = 'transform 0.1s linear';
+                    elements.qiblaCompassEl.style.transform = `rotate(${rotation}deg)`;
+                }
+            }
+
+            function setupCompass() {
+                const startListener = () => {
+                    // Éviter d'ajouter l'écouteur plusieurs fois
+                    if (!compassListenerActive) {
+                        // Utiliser 'deviceorientationabsolute' si disponible, il n'est pas affecté par le calibrage du champ magnétique de l'appareil
+                        const eventName = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation';
+                        window.addEventListener(eventName, handleOrientation, true);
+                        compassListenerActive = true;
+                        elements.calibrateQiblaBtn.style.display = 'none';
+                        elements.qiblaDirectionEl.innerHTML = `${Math.round(qiblaDirection)}° <span class="text-xs text-cyan-400">(Dynamique)</span>`;
+                    }
+                };
+
+                // iOS 13+ nécessite une autorisation de l'utilisateur pour les événements d'orientation de l'appareil.
+                if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    elements.calibrateQiblaBtn.style.display = 'block';
+                    initIcons(); 
+                    elements.calibrateQiblaBtn.addEventListener('click', () => {
+                        DeviceOrientationEvent.requestPermission()
+                            .then(permissionState => {
+                                if (permissionState === 'granted') {
+                                    startListener();
+                                } else {
+                                    // Informer l'utilisateur si la permission est refusée
+                                    elements.calibrateQiblaBtn.style.color = '#F87171'; // Couleur rouge pour indiquer le refus
+                                }
+                            })
+                            .catch(console.error);
+                    }, { once: true });
+                // Pour les autres appareils (comme Android) qui prennent en charge l'événement directement.
+                } else if ('ondeviceorientation' in window) {
+                    startListener();
+                }
+                // Si aucune des deux conditions n'est remplie (par exemple, un ordinateur de bureau sans capteurs),
+                // la fonction ne fait rien, et la boussole reste statique, ce qui est le comportement correct.
+            }
+
             async function fetchAPI(url) {
                 const response = await fetch(url);
-                if (response.ok) {
-                    return response.json();
-                }
+                if (response.ok) return response.json();
                 return Promise.reject(response.status);
             }
             
@@ -275,7 +329,7 @@
                     if (!navigator.geolocation) return resolve(FALLBACK_COORDS);
                     navigator.geolocation.getCurrentPosition(
                         (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-                        (err) => {
+                        () => {
                             elements.loaderText.innerHTML = `<span class="text-yellow-400">Localisation refusée.</span><br><span class="text-sm">Position par défaut active.</span>`;
                             resolve(FALLBACK_COORDS);
                         }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
@@ -299,10 +353,7 @@
                     nextPrayer = sortedPrayers[0];
                     if (nextPrayer) {
                        nextPrayer.date.setDate(nextPrayer.date.getDate() + 1);
-                    } else {
-                        // Handle case where there are no prayers
-                        return;
-                    }
+                    } else { return; }
                 }
 
                 const diff = nextPrayer.date - now;
@@ -332,8 +383,6 @@
                     const [prayerResponse, qiblaResponse] = await Promise.all([fetchAPI(prayerTimesURL), fetchAPI(qiblaURL)]);
 
                     const prayerData = prayerResponse.data;
-                    const qiblaData = qiblaResponse.data;
-
                     prayerTimesData = prayerData.timings;
                     elements.gridEl.innerHTML = Object.keys(PRAYER_NAMES).map((key, index) => {
                         const [h, m] = prayerData.timings[key].split(':');
@@ -349,8 +398,21 @@
                     elements.dateEl.textContent = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
                     const hijri = prayerData.date.hijri;
                     elements.hijriDateEl.textContent = `${hijri.day} ${HIJRI_MONTHS_FR[hijri.month.en] || hijri.month.en} ${hijri.year} AH`;
-                    elements.qiblaDirectionEl.textContent = `${Math.round(qiblaData.direction)}°`;
-                    elements.qiblaCompassEl.style.transform = `rotate(${qiblaData.direction}deg)`;
+                    
+                    const qiblaData = qiblaResponse.data;
+                    qiblaDirection = qiblaData.direction;
+                    
+                    // La rotation initiale est toujours définie par rapport au Nord.
+                    elements.qiblaCompassEl.style.transition = 'transform 1s ease-out';
+                    elements.qiblaCompassEl.style.transform = `rotate(${qiblaDirection}deg)`;
+                    
+                    // Mettre à jour le texte en fonction de si la boussole est active ou statique.
+                    if (compassListenerActive) {
+                        elements.qiblaDirectionEl.innerHTML = `${Math.round(qiblaDirection)}° <span class="text-xs text-cyan-400">(Dynamique)</span>`;
+                    } else {
+                        // Sur les ordinateurs ou si la permission est refusée, clarifier que la direction est par rapport au Nord.
+                        elements.qiblaDirectionEl.innerHTML = `${Math.round(qiblaDirection)}° <span class="text-xs text-gray-500">(par rapport au Nord)</span>`;
+                    }
 
                     if (countdownInterval) clearInterval(countdownInterval);
                     updateCountdown();
@@ -368,6 +430,7 @@
 
             async function main() {
                 initModals();
+                setupCompass();
                 const savedCoords = localStorage.getItem('manualCoords');
                 currentCoords = savedCoords ? JSON.parse(savedCoords) : await getUserLocation();
                 await fetchAndDisplayData(currentCoords);
@@ -378,3 +441,5 @@
     </script>
 </body>
 </html>
+
+
