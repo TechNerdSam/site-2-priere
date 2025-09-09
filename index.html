@@ -11,6 +11,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/feather-icons"></script>
 
+    <!-- LeafletJS for Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
+
     <style>
         :root {
             --glow-color: #00A9FF;
@@ -116,6 +121,17 @@
             to { opacity: 1; transform: translateY(0); }
         }
         .fade-in-up { animation: fadeInUp 0.6s ease-out forwards; }
+        
+        /* Leaflet map styles override */
+        .leaflet-container {
+            background-color: var(--background-start) !important;
+        }
+        .leaflet-control-attribution a {
+            color: var(--glow-color) !important;
+        }
+        .leaflet-tile-pane {
+            filter: grayscale(1) brightness(0.8) contrast(1.2);
+        }
     </style>
 </head>
 <body class="antialiased">
@@ -156,14 +172,17 @@
                         <i data-feather="compass" class="h-5 w-5"></i>
                     </button>
                 </div>
-                <div id="qibla-container" class="relative w-28 h-28">
-                     <div id="qibla-compass" class="transition-transform duration-1000 ease-out">
-                         <svg class="w-full h-full" viewBox="0 0 100 100">
-                             <circle cx="50" cy="50" r="48" stroke="rgba(255,255,255,0.1)" stroke-width="2" fill="none" />
-                             <path d="M 50 2 L 40 20 L 50 15 L 60 20 Z" fill="var(--glow-color)" stroke="var(--glow-color)" stroke-width="1.5" />
-                             <circle cx="50" cy="50" r="5" fill="var(--glow-color)"/>
-                         </svg>
-                     </div>
+                <div id="qibla-container" class="relative w-full h-40 bg-gray-900/50 rounded-lg overflow-hidden">
+                    <div id="qibla-compass-wrapper" class="w-full h-full flex items-center justify-center hidden">
+                         <div id="qibla-compass" class="w-28 h-28 transition-transform duration-1000 ease-out">
+                             <svg class="w-full h-full" viewBox="0 0 100 100">
+                                 <circle cx="50" cy="50" r="48" stroke="rgba(255,255,255,0.1)" stroke-width="2" fill="none" />
+                                 <path d="M 50 2 L 40 20 L 50 15 L 60 20 Z" fill="var(--glow-color)" stroke="var(--glow-color)" stroke-width="1.5" />
+                                 <circle cx="50" cy="50" r="5" fill="var(--glow-color)"/>
+                             </svg>
+                         </div>
+                    </div>
+                    <div id="qibla-map" class="w-full h-full hidden"></div>
                 </div>
                 <p id="qibla-direction" class="mt-2 font-semibold text-white text-lg">--°</p>
             </div>
@@ -205,7 +224,7 @@
             const HIJRI_MONTHS_FR = { "Muḥarram": "Mouharram", "Ṣafar": "Safar", "Rabīʿ al-awwal": "Rabi' al-awwal", "Rabīʿ ath-thānī": "Rabi' al-thani", "Jumādá al-ūlá": "Joumada al-oula", "Jumādá al-ākhirah": "Joumada al-akhira", "Rajab": "Rajab", "Shaʿbān": "Chaabane", "Ramaḍān": "Ramadan", "Shawwāl": "Chawwal", "Dhū al-Qaʿdah": "Dhou al qi'da", "Dhū al-Ḥijjah": "Dhou al-hijja" };
             const CALCULATION_METHODS = { '3': 'Ligue Islamique Mondiale', '4': 'Umm Al-Qura, Makkah', '2': 'Société Islamique d\'Amérique du Nord (ISNA)', '12': 'Union des Organisations Islamiques de France (UOIF)', '5': 'Autorité générale égyptienne de l\'enquête', '7': 'Institut de géophysique, Université de Téhéran', '15': 'Moonsighting Committee Worldwide' };
 
-            let prayerTimesData = {}, countdownInterval, currentCoords;
+            let prayerTimesData = {}, countdownInterval, currentCoords, qiblaMap = null;
             let calculationMethod = localStorage.getItem('calculationMethod') || '12';
             let qiblaDirection = 0;
             let compassListenerActive = false;
@@ -215,7 +234,9 @@
                 locationBtn: document.getElementById('location-btn'), locationText: document.getElementById('location-text'), locationSearchInput: document.getElementById('location-search-input'),
                 dateEl: document.getElementById('current-date'), hijriDateEl: document.getElementById('hijri-date'), gridEl: document.getElementById('prayer-times-grid'),
                 countdownHoursEl: document.getElementById('countdown-hours'), countdownMinutesEl: document.getElementById('countdown-minutes'), countdownSecondsEl: document.getElementById('countdown-seconds'),
-                nextPrayerNameEl: document.getElementById('next-prayer-name'), qiblaCompassEl: document.getElementById('qibla-compass'), qiblaDirectionEl: document.getElementById('qibla-direction'),
+                nextPrayerNameEl: document.getElementById('next-prayer-name'), 
+                qiblaCompassWrapper: document.getElementById('qibla-compass-wrapper'), qiblaCompassEl: document.getElementById('qibla-compass'), qiblaDirectionEl: document.getElementById('qibla-direction'),
+                qiblaMapEl: document.getElementById('qibla-map'),
                 settingsModal: document.getElementById('settings-modal'), settingsBtn: document.getElementById('settings-btn'), closeSettingsBtn: document.getElementById('close-settings-btn'), methodSelect: document.getElementById('calculation-method'),
                 locationModal: document.getElementById('location-modal'), closeLocationBtn: document.getElementById('close-location-btn'),
                 calibrateQiblaBtn: document.getElementById('calibrate-qibla-btn'),
@@ -269,13 +290,9 @@
             }
 
             function handleOrientation(event) {
-                // webkitCompassHeading est pour iOS. alpha est la norme.
                 let heading = event.webkitCompassHeading || event.alpha;
-                // Nous devons avoir une valeur d'orientation pour continuer
                 if (heading !== null && typeof heading !== "undefined") {
-                    // Ajuster la direction de la Qibla en fonction de l'orientation actuelle du téléphone
                     const rotation = qiblaDirection - heading;
-                    // Appliquer la rotation à l'élément de la boussole
                     elements.qiblaCompassEl.style.transition = 'transform 0.1s linear';
                     elements.qiblaCompassEl.style.transform = `rotate(${rotation}deg)`;
                 }
@@ -283,39 +300,25 @@
 
             function setupCompass() {
                 const startListener = () => {
-                    // Éviter d'ajouter l'écouteur plusieurs fois
                     if (!compassListenerActive) {
-                        // Utiliser 'deviceorientationabsolute' si disponible, il n'est pas affecté par le calibrage du champ magnétique de l'appareil
                         const eventName = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation';
                         window.addEventListener(eventName, handleOrientation, true);
                         compassListenerActive = true;
-                        elements.calibrateQiblaBtn.style.display = 'none';
-                        elements.qiblaDirectionEl.innerHTML = `${Math.round(qiblaDirection)}° <span class="text-xs text-cyan-400">(Dynamique)</span>`;
+                        elements.calibrateQiblaBtn.classList.add('hidden');
                     }
                 };
 
-                // iOS 13+ nécessite une autorisation de l'utilisateur pour les événements d'orientation de l'appareil.
                 if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                    elements.calibrateQiblaBtn.style.display = 'block';
+                    elements.calibrateQiblaBtn.classList.remove('hidden');
                     initIcons(); 
                     elements.calibrateQiblaBtn.addEventListener('click', () => {
                         DeviceOrientationEvent.requestPermission()
-                            .then(permissionState => {
-                                if (permissionState === 'granted') {
-                                    startListener();
-                                } else {
-                                    // Informer l'utilisateur si la permission est refusée
-                                    elements.calibrateQiblaBtn.style.color = '#F87171'; // Couleur rouge pour indiquer le refus
-                                }
-                            })
+                            .then(permissionState => { if (permissionState === 'granted') startListener(); })
                             .catch(console.error);
                     }, { once: true });
-                // Pour les autres appareils (comme Android) qui prennent en charge l'événement directement.
                 } else if ('ondeviceorientation' in window) {
                     startListener();
                 }
-                // Si aucune des deux conditions n'est remplie (par exemple, un ordinateur de bureau sans capteurs),
-                // la fonction ne fait rien, et la boussole reste statique, ce qui est le comportement correct.
             }
 
             async function fetchAPI(url) {
@@ -365,6 +368,18 @@
                 document.querySelectorAll('.prayer-card').forEach(c => c.classList.remove('next-prayer-glow'));
                 document.getElementById(`prayer-${nextPrayer.name}`)?.classList.add('next-prayer-glow');
             }
+            
+            function calculateDestinationPoint(lat, lon, bearing, distance) {
+                const R = 6371; // Earth's radius in km
+                const d = distance / R;
+                const brng = bearing * Math.PI / 180;
+                const lat1 = lat * Math.PI / 180;
+                const lon1 = lon * Math.PI / 180;
+                const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(brng));
+                let lon2 = lon1 + Math.atan2(Math.sin(brng) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
+                lon2 = (lon2 + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
+                return { lat: lat2 * 180 / Math.PI, lon: lon2 * 180 / Math.PI };
+            }
 
             async function fetchAndDisplayData(coords) {
                 elements.loader.style.display = 'flex';
@@ -399,19 +414,30 @@
                     const hijri = prayerData.date.hijri;
                     elements.hijriDateEl.textContent = `${hijri.day} ${HIJRI_MONTHS_FR[hijri.month.en] || hijri.month.en} ${hijri.year} AH`;
                     
-                    const qiblaData = qiblaResponse.data;
-                    qiblaDirection = qiblaData.direction;
-                    
-                    // La rotation initiale est toujours définie par rapport au Nord.
-                    elements.qiblaCompassEl.style.transition = 'transform 1s ease-out';
-                    elements.qiblaCompassEl.style.transform = `rotate(${qiblaDirection}deg)`;
-                    
-                    // Mettre à jour le texte en fonction de si la boussole est active ou statique.
+                    qiblaDirection = qiblaResponse.data.direction;
+                    elements.qiblaDirectionEl.textContent = `${Math.round(qiblaDirection)}°`;
+
                     if (compassListenerActive) {
+                        elements.qiblaMapEl.classList.add('hidden');
+                        elements.qiblaCompassWrapper.classList.remove('hidden');
                         elements.qiblaDirectionEl.innerHTML = `${Math.round(qiblaDirection)}° <span class="text-xs text-cyan-400">(Dynamique)</span>`;
+                        elements.qiblaCompassEl.style.transform = `rotate(0deg)`; // Reset rotation before applying orientation
                     } else {
-                        // Sur les ordinateurs ou si la permission est refusée, clarifier que la direction est par rapport au Nord.
-                        elements.qiblaDirectionEl.innerHTML = `${Math.round(qiblaDirection)}° <span class="text-xs text-gray-500">(par rapport au Nord)</span>`;
+                        elements.qiblaCompassWrapper.classList.add('hidden');
+                        elements.qiblaMapEl.classList.remove('hidden');
+                        elements.qiblaDirectionEl.innerHTML = `${Math.round(qiblaDirection)}° <span class="text-xs text-gray-500">(Direction sur la carte)</span>`;
+                        
+                        if (qiblaMap) qiblaMap.remove();
+                        qiblaMap = L.map(elements.qiblaMapEl, { zoomControl: false, attributionControl: false }).setView([latitude, longitude], 13);
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(qiblaMap);
+
+                        L.marker([latitude, longitude]).addTo(qiblaMap);
+                        const dest = calculateDestinationPoint(latitude, longitude, qiblaDirection, 2000);
+                        const polyline = L.polyline([[latitude, longitude], [dest.lat, dest.lon]], {color: 'var(--glow-color)', weight: 3}).addTo(qiblaMap);
+                        L.polylineDecorator(polyline, {
+                            patterns: [{ offset: '100%', repeat: 0, symbol: L.Symbol.arrowHead({ pixelSize: 12, polygon: false, pathOptions: { stroke: true, color: 'var(--glow-color)', weight: 2 } }) }]
+                        }).addTo(qiblaMap);
+                        qiblaMap.fitBounds(polyline.getBounds(), { padding: [20, 20] });
                     }
 
                     if (countdownInterval) clearInterval(countdownInterval);
@@ -441,5 +467,4 @@
     </script>
 </body>
 </html>
-
 
