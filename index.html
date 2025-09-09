@@ -115,14 +115,12 @@
             outline: none;
         }
 
-        /* Animation for elements fading in */
         @keyframes fadeInUp {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
         .fade-in-up { animation: fadeInUp 0.6s ease-out forwards; }
         
-        /* Leaflet map styles override */
         .leaflet-container {
             background-color: var(--background-start) !important;
         }
@@ -290,36 +288,55 @@
             }
 
             function handleOrientation(event) {
+                // 'alpha' is the compass direction in degrees, 0 is North.
                 let heading = event.webkitCompassHeading || event.alpha;
                 if (heading !== null && typeof heading !== "undefined") {
+                    // Adjust the Qibla direction based on the phone's current heading.
                     const rotation = qiblaDirection - heading;
+                    // Apply rotation to compass element with minimal transition for smoothness.
                     elements.qiblaCompassEl.style.transition = 'transform 0.1s linear';
                     elements.qiblaCompassEl.style.transform = `rotate(${rotation}deg)`;
                 }
             }
 
             function setupCompass() {
-                const startListener = () => {
+                const startListener = (eventName) => {
                     if (!compassListenerActive) {
-                        const eventName = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation';
                         window.addEventListener(eventName, handleOrientation, true);
                         compassListenerActive = true;
                         elements.calibrateQiblaBtn.classList.add('hidden');
+                        // Immediately update UI to reflect dynamic compass activation
+                        if (qiblaDirection) {
+                           fetchAndDisplayData(currentCoords);
+                        }
                     }
                 };
 
+                // iOS 13+ requires user permission for Device Orientation events.
                 if (typeof DeviceOrientationEvent.requestPermission === 'function') {
                     elements.calibrateQiblaBtn.classList.remove('hidden');
                     initIcons(); 
                     elements.calibrateQiblaBtn.addEventListener('click', () => {
                         DeviceOrientationEvent.requestPermission()
-                            .then(permissionState => { if (permissionState === 'granted') startListener(); })
+                            .then(permissionState => {
+                                if (permissionState === 'granted') {
+                                    // Prefer 'deviceorientationabsolute' for true north, fallback to 'deviceorientation'.
+                                    const eventName = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation';
+                                    startListener(eventName);
+                                }
+                            })
                             .catch(console.error);
                     }, { once: true });
-                } else if ('ondeviceorientation' in window) {
-                    startListener();
+                } else {
+                    // For other devices (like Android), check for the best available event.
+                    if ('ondeviceorientationabsolute' in window) {
+                        startListener('deviceorientationabsolute');
+                    } else if ('ondeviceorientation' in window) {
+                        startListener('deviceorientation');
+                    }
                 }
             }
+
 
             async function fetchAPI(url) {
                 const response = await fetch(url);
@@ -386,6 +403,7 @@
                 elements.mainContent.classList.remove('opacity-100');
                 try {
                     const { latitude, longitude } = coords;
+                    currentCoords = coords; // Ensure currentCoords is always up-to-date
                     let locationName = "Lieu par défaut";
                     try {
                         const geoResponse = await fetchAPI(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=fr`);
@@ -415,13 +433,12 @@
                     elements.hijriDateEl.textContent = `${hijri.day} ${HIJRI_MONTHS_FR[hijri.month.en] || hijri.month.en} ${hijri.year} AH`;
                     
                     qiblaDirection = qiblaResponse.data.direction;
-                    elements.qiblaDirectionEl.textContent = `${Math.round(qiblaDirection)}°`;
 
                     if (compassListenerActive) {
                         elements.qiblaMapEl.classList.add('hidden');
                         elements.qiblaCompassWrapper.classList.remove('hidden');
                         elements.qiblaDirectionEl.innerHTML = `${Math.round(qiblaDirection)}° <span class="text-xs text-cyan-400">(Dynamique)</span>`;
-                        elements.qiblaCompassEl.style.transform = `rotate(0deg)`; // Reset rotation before applying orientation
+                        elements.qiblaCompassEl.style.transform = `rotate(0deg)`;
                     } else {
                         elements.qiblaCompassWrapper.classList.add('hidden');
                         elements.qiblaMapEl.classList.remove('hidden');
